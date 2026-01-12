@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ghost Maze - 1v1 Memory Race</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000000;
+        }
+
+        canvas {
+            display: block;
+            background-color: #000000;
+        }
+
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            background-color: rgba(0, 0, 0, 0.85);
+            z-index: 100;
+        }
+
+        #overlay.active {
+            display: flex;
+        }
+
+        #winner-text {
+            font-family: 'Arial Black', Arial, sans-serif;
+            font-size: 72px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 8px;
+            text-shadow: 0 0 20px currentColor, 0 0 40px currentColor;
+        }
+
+        #winner-text.blue {
+            color: #4444FF;
+        }
+
+        #winner-text.red {
+            color: #FF4444;
+        }
+
+        #restart-hint {
+            font-family: Arial, sans-serif;
+            font-size: 24px;
+            color: #888888;
+            margin-top: 40px;
+        }
+
+        #controls-hint {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            color: #333333;
+            text-align: center;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="overlay">
+        <div id="winner-text"></div>
+        <div id="restart-hint">Press SPACE to play again</div>
+    </div>
+
+    <div id="controls-hint">
+        Player 1 (Blue): WASD | Player 2 (Red): Arrow Keys | Goal: Reach the green center!
+    </div>
+
+    <script>
+        // ============================================
+        // CONFIGURATION CONSTANTS
+        // ============================================
+        const GRID_SIZE = 21; // Must be odd for proper maze generation
+        const FLASH_INTERVAL = 3000; // ms between flashes
+        const FLASH_DURATION = 400; // ms walls stay visible
+        const PLAYER_SPEED = 180; // pixels per second
+        const PLAYER_SIZE_RATIO = 0.7; // Player size relative to cell
+
+        // Colors
+        const COLOR_BACKGROUND = '#000000';
+        const COLOR_WALL_VISIBLE = '#FFFFFF';
+        const COLOR_WALL_INVISIBLE = '#000000';
+        const COLOR_PLAYER1 = '#4444FF'; // Blue
+        const COLOR_PLAYER2 = '#FF4444'; // Red
+        const COLOR_GOAL = '#44FF44'; // Green
+
+        // ============================================
+        // CANVAS SETUP
+        // ============================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const overlay = document.getElementById('overlay');
+        const winnerText = document.getElementById('winner-text');
+
+        let CELL_SIZE;
+        let OFFSET_X;
+        let OFFSET_Y;
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            // Calculate cell size to fit the maze on screen with some padding
+            const maxWidth = canvas.width * 0.9;
+            const maxHeight = canvas.height * 0.9;
+            CELL_SIZE = Math.floor(Math.min(maxWidth / GRID_SIZE, maxHeight / GRID_SIZE));
+            
+            // Center the maze
+            OFFSET_X = Math.floor((canvas.width - GRID_SIZE * CELL_SIZE) / 2);
+            OFFSET_Y = Math.floor((canvas.height - GRID_SIZE * CELL_SIZE) / 2);
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // ============================================
+        // GAME STATE
+        // ============================================
+        let maze = [];
+        let players = [];
+        let gameOver = false;
+        let winner = null;
+        let wallsVisible = false;
+        let flashTimer = 0;
+        let isFlashing = false;
+
+        // Input state
+        const keys = {
+            w: false, a: false, s: false, d: false,
+            ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false
+        };
+
+        // ============================================
+        // MAZE GENERATION (Recursive Backtracker / DFS)
+        // ============================================
+        function generateMaze() {
+            // Initialize maze with all walls (1 = wall, 0 = path)
+            maze = [];
+            for (let y = 0; y < GRID_SIZE; y++) {
+                maze[y] = [];
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    maze[y][x] = 1; // All walls initially
+                }
+            }
+
+            // Directions: [dx, dy]
+            const directions = [
+                [0, -2], // Up
+                [2, 0],  // Right
+                [0, 2],  // Down
+                [-2, 0]  // Left
+            ];
+
+            // Shuffle array helper
+            function shuffle(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+
+            // Check if cell is within bounds
+            function inBounds(x, y) {
+                return x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1;
+            }
+
+            // Recursive carve function
+            function carve(x, y) {
+                maze[y][x] = 0; // Mark as path
+
+                const shuffledDirs = shuffle([...directions]);
+
+                for (const [dx, dy] of shuffledDirs) {
+                    const nx = x + dx;
+                    const ny = y + dy;
+
+                    if (inBounds(nx, ny) && maze[ny][nx] === 1) {
+                        // Carve through the wall between current and next cell
+                        maze[y + dy / 2][x + dx / 2] = 0;
+                        carve(nx, ny);
+                    }
+                }
+            }
+
+            // Start carving from (1, 1)
+            carve(1, 1);
+
+            // Create the 3x3 goal zone in the center
+            const centerX = Math.floor(GRID_SIZE / 2);
+            const centerY = Math.floor(GRID_SIZE / 2);
+            
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    maze[centerY + dy][centerX + dx] = 0;
+                }
+            }
+
+            // Ensure paths connect to the goal zone from multiple directions
+            // Carve paths from goal to nearest open cells
+            ensureGoalAccessibility(centerX, centerY);
+        }
+
+        function ensureGoalAccessibility(centerX, centerY) {
+            // Check each direction from the goal zone edge and ensure connectivity
+            const checkPoints = [
+                { x: centerX, y: centerY - 2 },     // Above
+                { x: centerX, y: centerY + 2 },     // Below
+                { x: centerX - 2, y: centerY },     // Left
+                { x: centerX + 2, y: centerY }      // Right
+            ];
+
+            for (const point of checkPoints) {
+                if (point.x > 0 && point.x < GRID_SIZE - 1 && 
+                    point.y > 0 && point.y < GRID_SIZE - 1) {
+                    // Carve a path from goal edge to this point
+                    const midX = Math.floor((centerX + point.x) / 2);
+                    const midY = Math.floor((centerY + point.y) / 2);
+                    maze[midY][midX] = 0;
+                    maze[point.y][point.x] = 0;
+                }
+            }
+        }
+
+        // ============================================
+        // PLAYER INITIALIZATION
+        // ============================================
+        function findSpawnPoints() {
+            let topLeftSpawn = null;
+            let bottomRightSpawn = null;
+
+            // Find top-left-most path cell
+            outer1: for (let y = 1; y < GRID_SIZE - 1; y++) {
+                for (let x = 1; x < GRID_SIZE - 1; x++) {
+                    if (maze[y][x] === 0) {
+                        topLeftSpawn = { x, y };
+                        break outer1;
+                    }
+                }
+            }
+
+            // Find bottom-right-most path cell
+            outer2: for (let y = GRID_SIZE - 2; y > 0; y--) {
+                for (let x = GRID_SIZE - 2; x > 0; x--) {
+                    if (maze[y][x] === 0) {
+                        bottomRightSpawn = { x, y };
+                        break outer2;
+                    }
+                }
+            }
+
+            return { topLeftSpawn, bottomRightSpawn };
+        }
+
+        function initPlayers() {
+            const { topLeftSpawn, bottomRightSpawn } = findSpawnPoints();
+            const playerSize = CELL_SIZE * PLAYER_SIZE_RATIO;
+
+            players = [
+                {
+                    // Player 1 - Blue
+                    x: OFFSET_X + topLeftSpawn.x * CELL_SIZE + (CELL_SIZE - playerSize) / 2,
+                    y: OFFSET_Y + topLeftSpawn.y * CELL_SIZE + (CELL_SIZE - playerSize) / 2,
+                    size: playerSize,
+                    color: COLOR_PLAYER1,
+                    name: 'BLUE'
+                },
+                {
+                    // Player 2 - Red
+                    x: OFFSET_X + bottomRightSpawn.x * CELL_SIZE + (CELL_SIZE - playerSize) / 2,
+                    y: OFFSET_Y + bottomRightSpawn.y * CELL_SIZE + (CELL_SIZE - playerSize) / 2,
+                    size: playerSize,
+                    color: COLOR_PLAYER2,
+                    name: 'RED'
+                }
+            ];
+        }
+
+        // ============================================
+        // INPUT HANDLING
+        // ============================================
+        document.addEventListener('keydown', (e) => {
+            const key = e.key;
+            
+            if (key in keys) {
+                keys[key] = true;
+                e.preventDefault();
+            }
+            
+            // Handle lowercase wasd
+            if (key.toLowerCase() in keys) {
+                keys[key.toLowerCase()] = true;
+                e.preventDefault();
+            }
+
+            // Restart game
+            if (key === ' ' && gameOver) {
+                restartGame();
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            const key = e.key;
+            
+            if (key in keys) {
+                keys[key] = false;
+            }
+            
+            if (key.toLowerCase() in keys) {
+                keys[key.toLowerCase()] = false;
+            }
+        });
+
+        // ============================================
+        // COLLISION DETECTION
+        // ============================================
+        function checkWallCollision(x, y, size) {
+            // Check all four corners of the player
+            const corners = [
+                { x: x + 2, y: y + 2 },                     // Top-left (with small padding)
+                { x: x + size - 2, y: y + 2 },             // Top-right
+                { x: x + 2, y: y + size - 2 },             // Bottom-left
+                { x: x + size - 2, y: y + size - 2 }       // Bottom-right
+            ];
+
+            for (const corner of corners) {
+                const gridX = Math.floor((corner.x - OFFSET_X) / CELL_SIZE);
+                const gridY = Math.floor((corner.y - OFFSET_Y) / CELL_SIZE);
+
+                // Check bounds
+                if (gridX < 0 || gridX >= GRID_SIZE || gridY < 0 || gridY >= GRID_SIZE) {
+                    return true; // Out of bounds = collision
+                }
+
+                // Check if wall
+                if (maze[gridY][gridX] === 1) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // ============================================
+        // PLAYER MOVEMENT
+        // ============================================
+        function updatePlayers(dt) {
+            if (gameOver) return;
+
+            const moveAmount = PLAYER_SPEED * dt;
+
+            // Player 1 (WASD)
+            let p1dx = 0, p1dy = 0;
+            if (keys.w) p1dy = -1;
+            if (keys.s) p1dy = 1;
+            if (keys.a) p1dx = -1;
+            if (keys.d) p1dx = 1;
+
+            // Player 2 (Arrow Keys)
+            let p2dx = 0, p2dy = 0;
+            if (keys.ArrowUp) p2dy = -1;
+            if (keys.ArrowDown) p2dy = 1;
+            if (keys.ArrowLeft) p2dx = -1;
+            if (keys.ArrowRight) p2dx = 1;
+
+            // Move Player 1
+            movePlayer(players[0], p1dx, p1dy, moveAmount);
+
+            // Move Player 2
+            movePlayer(players[1], p2dx, p2dy, moveAmount);
+        }
+
+        function movePlayer(player, dx, dy, moveAmount) {
+            // Try horizontal movement
+            if (dx !== 0) {
+                const newX = player.x + dx * moveAmount;
+                if (!checkWallCollision(newX, player.y, player.size)) {
+                    player.x = newX;
+                }
+            }
+
+            // Try vertical movement
+            if (dy !== 0) {
+                const newY = player.y + dy * moveAmount;
+                if (!checkWallCollision(player.x, newY, player.size)) {
+                    player.y = newY;
+                }
+            }
+        }
+
+        // ============================================
+        // WIN CONDITION
+        // ============================================
+        function checkWin() {
+            if (gameOver) return;
+
+            const centerX = Math.floor(GRID_SIZE / 2);
+            const centerY = Math.floor(GRID_SIZE / 2);
+
+            // Goal zone bounds in pixels
+            const goalLeft = OFFSET_X + (centerX - 1) * CELL_SIZE;
+            const goalTop = OFFSET_Y + (centerY - 1) * CELL_SIZE;
+            const goalRight = goalLeft + 3 * CELL_SIZE;
+            const goalBottom = goalTop + 3 * CELL_SIZE;
+
+            for (let i = 0; i < players.length; i++) {
+                const p = players[i];
+                const playerCenterX = p.x + p.size / 2;
+                const playerCenterY = p.y + p.size / 2;
+
+                // Check if player center is within goal zone
+                if (playerCenterX >= goalLeft && playerCenterX <= goalRight &&
+                    playerCenterY >= goalTop && playerCenterY <= goalBottom) {
+                    gameOver = true;
+                    winner = p.name;
+                    showWinScreen();
+                    return;
+                }
+            }
+        }
+
+        function showWinScreen() {
+            winnerText.textContent = `${winner} WINS!`;
+            winnerText.className = winner.toLowerCase();
+            overlay.classList.add('active');
+        }
+
+        // ============================================
+        // GHOST FLASH MECHANIC
+        // ============================================
+        function updateFlash(dt) {
+            flashTimer += dt * 1000; // Convert to ms
+
+            if (!isFlashing && flashTimer >= FLASH_INTERVAL) {
+                // Start flash
+                isFlashing = true;
+                wallsVisible = true;
+                flashTimer = 0;
+            } else if (isFlashing && flashTimer >= FLASH_DURATION) {
+                // End flash
+                isFlashing = false;
+                wallsVisible = false;
+                flashTimer = 0;
+            }
+        }
+
+        // ============================================
+        // RENDERING
+        // ============================================
+        function render() {
+            // Clear canvas
+            ctx.fillStyle = COLOR_BACKGROUND;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw maze walls
+            const wallColor = wallsVisible ? COLOR_WALL_VISIBLE : COLOR_WALL_INVISIBLE;
+            ctx.fillStyle = wallColor;
+
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    if (maze[y][x] === 1) {
+                        ctx.fillRect(
+                            OFFSET_X + x * CELL_SIZE,
+                            OFFSET_Y + y * CELL_SIZE,
+                            CELL_SIZE,
+                            CELL_SIZE
+                        );
+                    }
+                }
+            }
+
+            // Draw goal zone (always visible)
+            const centerX = Math.floor(GRID_SIZE / 2);
+            const centerY = Math.floor(GRID_SIZE / 2);
+            ctx.fillStyle = COLOR_GOAL;
+            ctx.globalAlpha = 0.6;
+            ctx.fillRect(
+                OFFSET_X + (centerX - 1) * CELL_SIZE,
+                OFFSET_Y + (centerY - 1) * CELL_SIZE,
+                3 * CELL_SIZE,
+                3 * CELL_SIZE
+            );
+            ctx.globalAlpha = 1.0;
+
+            // Draw goal border
+            ctx.strokeStyle = COLOR_GOAL;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(
+                OFFSET_X + (centerX - 1) * CELL_SIZE,
+                OFFSET_Y + (centerY - 1) * CELL_SIZE,
+                3 * CELL_SIZE,
+                3 * CELL_SIZE
+            );
+
+            // Draw players
+            for (const player of players) {
+                ctx.fillStyle = player.color;
+                ctx.fillRect(player.x, player.y, player.size, player.size);
+
+                // Player border for visibility
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(player.x, player.y, player.size, player.size);
+            }
+
+            // Draw flash indicator (subtle)
+            if (wallsVisible) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        // ============================================
+        // GAME LOOP
+        // ============================================
+        let lastTime = 0;
+
+        function gameLoop(timestamp) {
+            const dt = (timestamp - lastTime) / 1000; // Delta time in seconds
+            lastTime = timestamp;
+
+            // Cap delta time to prevent huge jumps
+            const cappedDt = Math.min(dt, 0.1);
+
+            if (!gameOver) {
+                updateFlash(cappedDt);
+                updatePlayers(cappedDt);
+                checkWin();
+            }
+
+            render();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ============================================
+        // GAME INITIALIZATION
+        // ============================================
+        function initGame() {
+            generateMaze();
+            initPlayers();
+            gameOver = false;
+            winner = null;
+            wallsVisible = false;
+            flashTimer = 0;
+            isFlashing = false;
+            overlay.classList.remove('active');
+        }
+
+        function restartGame() {
+            // Reset key states
+            for (const key in keys) {
+                keys[key] = false;
+            }
+            initGame();
+        }
+
+        // Start the game
+        initGame();
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
