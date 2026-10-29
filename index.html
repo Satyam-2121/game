@@ -121,21 +121,30 @@
         let OFFSET_Y;
 
         function resizeCanvas() {
+            const previousCellSize = CELL_SIZE;
+            const previousOffsetX = OFFSET_X;
+            const previousOffsetY = OFFSET_Y;
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             
             // Calculate cell size to fit the maze on screen with some padding
             const maxWidth = canvas.width * 0.9;
             const maxHeight = canvas.height * 0.9;
-            CELL_SIZE = Math.floor(Math.min(maxWidth / GRID_SIZE, maxHeight / GRID_SIZE));
+            CELL_SIZE = Math.max(1, Math.floor(Math.min(maxWidth / GRID_SIZE, maxHeight / GRID_SIZE)));
             
             // Center the maze
             OFFSET_X = Math.floor((canvas.width - GRID_SIZE * CELL_SIZE) / 2);
             OFFSET_Y = Math.floor((canvas.height - GRID_SIZE * CELL_SIZE) / 2);
-        }
 
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+            // Keep players in the same maze positions when the viewport changes.
+            if (previousCellSize) {
+                for (const player of players) {
+                    player.x = OFFSET_X + ((player.x - previousOffsetX) / previousCellSize) * CELL_SIZE;
+                    player.y = OFFSET_Y + ((player.y - previousOffsetY) / previousCellSize) * CELL_SIZE;
+                    player.size = CELL_SIZE * PLAYER_SIZE_RATIO;
+                }
+            }
+        }
 
         // ============================================
         // GAME STATE
@@ -147,6 +156,9 @@
         let wallsVisible = false;
         let flashTimer = 0;
         let isFlashing = false;
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
 
         // Input state
         const keys = {
