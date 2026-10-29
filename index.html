@@ -166,6 +166,15 @@
             ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false
         };
 
+        function resetKeys() {
+            for (const key in keys) {
+                keys[key] = false;
+            }
+        }
+
+        // Keyup may occur outside the page after the window loses focus.
+        window.addEventListener('blur', resetKeys);
+
         // ============================================
         // MAZE GENERATION (Recursive Backtracker / DFS)
         // ============================================
@@ -585,10 +594,7 @@
         }
 
         function restartGame() {
-            // Reset key states
-            for (const key in keys) {
-                keys[key] = false;
-            }
+            resetKeys();
             initGame();
         }
 
