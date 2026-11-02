@@ -362,11 +362,12 @@
         // ============================================
         function checkWallCollision(x, y, size) {
             // Check all four corners of the player
+            const padding = Math.min(2, size / 4);
             const corners = [
-                { x: x + 2, y: y + 2 },                     // Top-left (with small padding)
-                { x: x + size - 2, y: y + 2 },             // Top-right
-                { x: x + 2, y: y + size - 2 },             // Bottom-left
-                { x: x + size - 2, y: y + size - 2 }       // Bottom-right
+                { x: x + padding, y: y + padding },
+                { x: x + size - padding, y: y + padding },
+                { x: x + padding, y: y + size - padding },
+                { x: x + size - padding, y: y + size - padding }
             ];
 
             for (const corner of corners) {
@@ -417,19 +418,23 @@
         }
 
         function movePlayer(player, dx, dy, moveAmount) {
-            // Try horizontal movement
-            if (dx !== 0) {
-                const newX = player.x + dx * moveAmount;
-                if (!checkWallCollision(newX, player.y, player.size)) {
-                    player.x = newX;
-                }
-            }
+            // Check intermediate positions so a frame cannot jump over a wall.
+            const steps = Math.max(1, Math.ceil(moveAmount / (CELL_SIZE / 2)));
+            const stepAmount = moveAmount / steps;
 
-            // Try vertical movement
-            if (dy !== 0) {
-                const newY = player.y + dy * moveAmount;
-                if (!checkWallCollision(player.x, newY, player.size)) {
-                    player.y = newY;
+            for (let step = 0; step < steps; step++) {
+                if (dx !== 0) {
+                    const newX = player.x + dx * stepAmount;
+                    if (!checkWallCollision(newX, player.y, player.size)) {
+                        player.x = newX;
+                    }
+                }
+
+                if (dy !== 0) {
+                    const newY = player.y + dy * stepAmount;
+                    if (!checkWallCollision(player.x, newY, player.size)) {
+                        player.y = newY;
+                    }
                 }
             }
         }
