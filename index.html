@@ -418,6 +418,13 @@
         }
 
         function movePlayer(player, dx, dy, moveAmount) {
+            // Diagonal input should use the same total speed as one direction.
+            const directionLength = Math.hypot(dx, dy);
+            if (directionLength > 1) {
+                dx /= directionLength;
+                dy /= directionLength;
+            }
+
             // Check intermediate positions so a frame cannot jump over a wall.
             const steps = Math.max(1, Math.ceil(moveAmount / (CELL_SIZE / 2)));
             const stepAmount = moveAmount / steps;

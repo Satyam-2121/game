@@ -60,3 +60,28 @@ test('movement covers the requested distance in an open maze', () => {
         Math.abs(p.x - 36.9) < 1e-9;
     `), true);
 });
+
+for (const [player, horizontal, vertical] of [[0, 'd', 's'], [1, 'ArrowRight', 'ArrowDown']]) {
+    test(`player ${player + 1} travels at the same speed diagonally and horizontally`, () => {
+        function distance(diagonal) {
+            const run = loadGame();
+            return run(`
+                CELL_SIZE = 20; OFFSET_X = 0; OFFSET_Y = 0;
+                maze = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
+                players = [
+                    { x: 50, y: 50, size: 14 },
+                    { x: 100, y: 100, size: 14 },
+                ];
+                const before = { ...players[${player}] };
+                keys.${horizontal} = true;
+                keys.${vertical} = ${diagonal};
+                updatePlayers(0.05);
+                Math.hypot(players[${player}].x - before.x, players[${player}].y - before.y);
+            `);
+        }
+
+        assert.ok(Math.abs(distance(false) - 9) < 1e-9);
+        assert.ok(Math.abs(distance(true) - distance(false)) < 1e-9,
+            'diagonal input grants extra movement speed');
+    });
+}
