@@ -397,18 +397,12 @@
             const moveAmount = PLAYER_SPEED * dt;
 
             // Player 1 (WASD)
-            let p1dx = 0, p1dy = 0;
-            if (keys.w) p1dy = -1;
-            if (keys.s) p1dy = 1;
-            if (keys.a) p1dx = -1;
-            if (keys.d) p1dx = 1;
+            const p1dx = Number(keys.d) - Number(keys.a);
+            const p1dy = Number(keys.s) - Number(keys.w);
 
             // Player 2 (Arrow Keys)
-            let p2dx = 0, p2dy = 0;
-            if (keys.ArrowUp) p2dy = -1;
-            if (keys.ArrowDown) p2dy = 1;
-            if (keys.ArrowLeft) p2dx = -1;
-            if (keys.ArrowRight) p2dx = 1;
+            const p2dx = Number(keys.ArrowRight) - Number(keys.ArrowLeft);
+            const p2dy = Number(keys.ArrowDown) - Number(keys.ArrowUp);
 
             // Move Player 1
             movePlayer(players[0], p1dx, p1dy, moveAmount);

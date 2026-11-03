@@ -21,6 +21,24 @@ function loadGame() {
     return code => vm.runInContext(code, context);
 }
 
+for (const [player, left, right, up, down] of [
+    [0, 'a', 'd', 'w', 's'],
+    [1, 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'],
+]) {
+    test(`opposing keys cancel movement for player ${player + 1}`, () => {
+        const run = loadGame();
+        assert.equal(run(`
+            CELL_SIZE = 20; OFFSET_X = 0; OFFSET_Y = 0;
+            maze = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
+            players = [{ x: 50, y: 50, size: 14 }, { x: 100, y: 100, size: 14 }];
+            const before = { ...players[${player}] };
+            keys.${left} = keys.${right} = keys.${up} = keys.${down} = true;
+            updatePlayers(0.05);
+            players[${player}].x === before.x && players[${player}].y === before.y;
+        `), true);
+    });
+}
+
 for (const [axis, direction] of [['x', 1], ['x', -1], ['y', 1], ['y', -1]]) {
     test(`movement cannot skip a wall along ${axis} in direction ${direction}`, () => {
         const run = loadGame();
