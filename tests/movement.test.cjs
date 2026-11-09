@@ -79,6 +79,18 @@ test('movement covers the requested distance in an open maze', () => {
     `), true);
 });
 
+test('a player wins when one frame crosses the goal on a small screen', () => {
+    const run = loadGame();
+    assert.equal(run(`
+        CELL_SIZE = 1; OFFSET_X = 0; OFFSET_Y = 0;
+        maze = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
+        gameOver = false; winner = null;
+        const p = { x: 4, y: 10, size: 0.7, name: 'BLUE' };
+        movePlayer(p, 1, 0, 12);
+        gameOver && winner === 'BLUE' && p.x < 12;
+    `), true);
+});
+
 for (const [player, horizontal, vertical] of [[0, 'd', 's'], [1, 'ArrowRight', 'ArrowDown']]) {
     test(`player ${player + 1} travels at the same speed diagonally and horizontally`, () => {
         function distance(diagonal) {

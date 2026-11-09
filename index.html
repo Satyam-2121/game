@@ -408,7 +408,7 @@
             movePlayer(players[0], p1dx, p1dy, moveAmount);
 
             // Move Player 2
-            movePlayer(players[1], p2dx, p2dy, moveAmount);
+            if (!gameOver) movePlayer(players[1], p2dx, p2dy, moveAmount);
         }
 
         function movePlayer(player, dx, dy, moveAmount) {
@@ -437,13 +437,17 @@
                         player.y = newY;
                     }
                 }
+
+                // Detect reaching the goal even when a frame crosses it entirely.
+                checkWin(player);
+                if (gameOver) return;
             }
         }
 
         // ============================================
         // WIN CONDITION
         // ============================================
-        function checkWin() {
+        function checkWin(movingPlayer) {
             if (gameOver) return;
 
             const centerX = Math.floor(GRID_SIZE / 2);
@@ -455,8 +459,7 @@
             const goalRight = goalLeft + 3 * CELL_SIZE;
             const goalBottom = goalTop + 3 * CELL_SIZE;
 
-            for (let i = 0; i < players.length; i++) {
-                const p = players[i];
+            for (const p of movingPlayer ? [movingPlayer] : players) {
                 const playerCenterX = p.x + p.size / 2;
                 const playerCenterY = p.y + p.size / 2;
 
