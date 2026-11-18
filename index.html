@@ -325,6 +325,8 @@
         // INPUT HANDLING
         // ============================================
         document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+
             const key = e.key;
             
             if (key in keys) {

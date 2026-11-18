@@ -5,6 +5,7 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 function loadGame() {
+    const inputHandlers = {};
     const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
     const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
     const element = { classList: { add() {}, remove() {} } };
@@ -13,13 +14,31 @@ function loadGame() {
         window: { innerWidth: 800, innerHeight: 600, addEventListener() {} },
         document: {
             getElementById: id => id === 'gameCanvas' ? canvas : element,
-            addEventListener() {},
+            addEventListener(type, handler) { inputHandlers[type] = handler; },
         },
         requestAnimationFrame() {},
     });
     vm.runInContext(script, context);
-    return code => vm.runInContext(code, context);
+    const run = code => vm.runInContext(code, context);
+    run.key = (type, event) => {
+        let prevented = false;
+        inputHandlers[type]({ ...event, preventDefault() { prevented = true; } });
+        return prevented;
+    };
+    return run;
 }
+
+test('browser shortcuts do not move players or consume the shortcut', () => {
+    const run = loadGame();
+    for (const modifier of ['ctrlKey', 'metaKey', 'altKey']) {
+        assert.equal(run.key('keydown', { key: 'w', [modifier]: true }), false);
+        assert.equal(run('keys.w'), false);
+    }
+    assert.equal(run.key('keydown', { key: 'W', shiftKey: true }), true);
+    assert.equal(run('keys.w'), true);
+    run.key('keyup', { key: 'w', ctrlKey: true });
+    assert.equal(run('keys.w'), false);
+});
 
 for (const [player, left, right, up, down] of [
     [0, 'a', 'd', 'w', 's'],
