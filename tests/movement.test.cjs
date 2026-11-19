@@ -40,6 +40,18 @@ test('browser shortcuts do not move players or consume the shortcut', () => {
     assert.equal(run('keys.w'), false);
 });
 
+test('a held space key leaves the result visible until a fresh press', () => {
+    const run = loadGame();
+    run('gameOver = true; winner = "BLUE";');
+    run.key('keydown', { key: ' ', repeat: true });
+    assert.equal(run('gameOver'), true);
+    assert.equal(run('winner'), 'BLUE');
+    run.key('keyup', { key: ' ' });
+    run.key('keydown', { key: ' ', repeat: false });
+    assert.equal(run('gameOver'), false);
+    assert.equal(run('winner'), null);
+});
+
 for (const [player, left, right, up, down] of [
     [0, 'a', 'd', 'w', 's'],
     [1, 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'],

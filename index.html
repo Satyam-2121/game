@@ -342,8 +342,8 @@
 
             // Restart game
             if (key === ' ' && gameOver) {
-                restartGame();
                 e.preventDefault();
+                if (!e.repeat) restartGame();
             }
         });
 
