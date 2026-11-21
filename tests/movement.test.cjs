@@ -52,6 +52,15 @@ test('a held space key leaves the result visible until a fresh press', () => {
     assert.equal(run('winner'), null);
 });
 
+test('maze walls flash every three seconds and restart with the walls hidden', () => {
+    const run = loadGame();
+    assert.equal(run('updateFlash(2.95); wallsVisible'), false);
+    assert.equal(run('updateFlash(0.10); wallsVisible'), true);
+    assert.equal(run('updateFlash(0.36); wallsVisible'), false);
+    assert.equal(run('updateFlash(2.60); wallsVisible'), true);
+    assert.equal(run('restartGame(); updateFlash(0.15); wallsVisible'), false);
+});
+
 for (const [player, left, right, up, down] of [
     [0, 'a', 'd', 'w', 's'],
     [1, 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'],

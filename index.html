@@ -155,7 +155,6 @@
         let winner = null;
         let wallsVisible = false;
         let flashTimer = 0;
-        let isFlashing = false;
 
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
@@ -487,18 +486,8 @@
         // ============================================
         function updateFlash(dt) {
             flashTimer += dt * 1000; // Convert to ms
-
-            if (!isFlashing && flashTimer >= FLASH_INTERVAL) {
-                // Start flash
-                isFlashing = true;
-                wallsVisible = true;
-                flashTimer = 0;
-            } else if (isFlashing && flashTimer >= FLASH_DURATION) {
-                // End flash
-                isFlashing = false;
-                wallsVisible = false;
-                flashTimer = 0;
-            }
+            wallsVisible = flashTimer >= FLASH_INTERVAL &&
+                flashTimer % FLASH_INTERVAL < FLASH_DURATION;
         }
 
         // ============================================
@@ -600,7 +589,6 @@
             winner = null;
             wallsVisible = false;
             flashTimer = 0;
-            isFlashing = false;
             overlay.classList.remove('active');
         }
 
