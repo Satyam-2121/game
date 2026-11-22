@@ -43,6 +43,7 @@
 
         #winner-text {
             font-family: 'Arial Black', Arial, sans-serif;
+            color: #FFFFFF;
             font-size: 72px;
             font-weight: bold;
             text-transform: uppercase;
@@ -405,50 +406,32 @@
             const p2dx = Number(keys.ArrowRight) - Number(keys.ArrowLeft);
             const p2dy = Number(keys.ArrowDown) - Number(keys.ArrowUp);
 
-            // Move Player 1
-            movePlayer(players[0], p1dx, p1dy, moveAmount);
-
-            // Move Player 2
-            if (!gameOver) movePlayer(players[1], p2dx, p2dy, moveAmount);
-        }
-
-        function movePlayer(player, dx, dy, moveAmount) {
-            // Diagonal input should use the same total speed as one direction.
-            const directionLength = Math.hypot(dx, dy);
-            if (directionLength > 1) {
-                dx /= directionLength;
-                dy /= directionLength;
-            }
-
-            // Check intermediate positions so a frame cannot jump over a wall.
+            // Move both players through the same substeps before judging a finish.
             const steps = Math.max(1, Math.ceil(moveAmount / (CELL_SIZE / 2)));
             const stepAmount = moveAmount / steps;
+            const p1Step = stepAmount / Math.max(1, Math.hypot(p1dx, p1dy));
+            const p2Step = stepAmount / Math.max(1, Math.hypot(p2dx, p2dy));
 
-            for (let step = 0; step < steps; step++) {
-                if (dx !== 0) {
-                    const newX = player.x + dx * stepAmount;
-                    if (!checkWallCollision(newX, player.y, player.size)) {
-                        player.x = newX;
-                    }
-                }
+            for (let step = 0; step < steps && !gameOver; step++) {
+                movePlayerStep(players[0], p1dx * p1Step, p1dy * p1Step);
+                movePlayerStep(players[1], p2dx * p2Step, p2dy * p2Step);
+                checkWin();
+            }
+        }
 
-                if (dy !== 0) {
-                    const newY = player.y + dy * stepAmount;
-                    if (!checkWallCollision(player.x, newY, player.size)) {
-                        player.y = newY;
-                    }
-                }
-
-                // Detect reaching the goal even when a frame crosses it entirely.
-                checkWin(player);
-                if (gameOver) return;
+        function movePlayerStep(player, dx, dy) {
+            if (dx !== 0 && !checkWallCollision(player.x + dx, player.y, player.size)) {
+                player.x += dx;
+            }
+            if (dy !== 0 && !checkWallCollision(player.x, player.y + dy, player.size)) {
+                player.y += dy;
             }
         }
 
         // ============================================
         // WIN CONDITION
         // ============================================
-        function checkWin(movingPlayer) {
+        function checkWin() {
             if (gameOver) return;
 
             const centerX = Math.floor(GRID_SIZE / 2);
@@ -460,23 +443,22 @@
             const goalRight = goalLeft + 3 * CELL_SIZE;
             const goalBottom = goalTop + 3 * CELL_SIZE;
 
-            for (const p of movingPlayer ? [movingPlayer] : players) {
+            const finishers = players.filter(p => {
                 const playerCenterX = p.x + p.size / 2;
                 const playerCenterY = p.y + p.size / 2;
 
-                // Check if player center is within goal zone
-                if (playerCenterX >= goalLeft && playerCenterX <= goalRight &&
-                    playerCenterY >= goalTop && playerCenterY <= goalBottom) {
-                    gameOver = true;
-                    winner = p.name;
-                    showWinScreen();
-                    return;
-                }
-            }
+                return playerCenterX >= goalLeft && playerCenterX <= goalRight &&
+                    playerCenterY >= goalTop && playerCenterY <= goalBottom;
+            });
+            if (!finishers.length) return;
+
+            gameOver = true;
+            winner = finishers.length > 1 ? 'DRAW' : finishers[0].name;
+            showWinScreen();
         }
 
         function showWinScreen() {
-            winnerText.textContent = `${winner} WINS!`;
+            winnerText.textContent = winner === 'DRAW' ? 'DRAW!' : `${winner} WINS!`;
             winnerText.className = winner.toLowerCase();
             overlay.classList.add('active');
         }
@@ -571,7 +553,6 @@
             if (!gameOver) {
                 updateFlash(cappedDt);
                 updatePlayers(cappedDt);
-                checkWin();
             }
 
             render();

@@ -86,12 +86,14 @@ for (const [axis, direction] of [['x', 1], ['x', -1], ['y', 1], ['y', -1]]) {
             CELL_SIZE = 6; OFFSET_X = 0; OFFSET_Y = 0;
             maze = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
             const p = { x: 18.9, y: 18.9, size: 4.2 };
+            players = [p, { x: 90, y: 90, size: 4.2 }];
         `);
         const wall = direction > 0 ? 4 : 2;
         run(axis === 'x'
             ? `for (const row of maze) row[${wall}] = 1;`
             : `maze[${wall}].fill(1);`);
-        run(`movePlayer(p, ${axis === 'x' ? direction : 0}, ${axis === 'y' ? direction : 0}, 18);`);
+        const key = axis === 'x' ? (direction > 0 ? 'd' : 'a') : (direction > 0 ? 's' : 'w');
+        run(`keys.${key} = true; updatePlayers(0.1);`);
         const position = run(`p.${axis}`);
         assert.ok(direction > 0 ? position < wall * 6 : position > (wall + 1) * 6,
             'player crossed a complete wall in one frame');
@@ -114,7 +116,9 @@ test('movement covers the requested distance in an open maze', () => {
         CELL_SIZE = 6; OFFSET_X = 0; OFFSET_Y = 0;
         maze = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
         const p = { x: 18.9, y: 18.9, size: 4.2 };
-        movePlayer(p, 1, 0, 18);
+        players = [p, { x: 90, y: 90, size: 4.2 }];
+        keys.d = true;
+        updatePlayers(0.1);
         Math.abs(p.x - 36.9) < 1e-9;
     `), true);
 });
@@ -126,10 +130,32 @@ test('a player wins when one frame crosses the goal on a small screen', () => {
         maze = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
         gameOver = false; winner = null;
         const p = { x: 4, y: 10, size: 0.7, name: 'BLUE' };
-        movePlayer(p, 1, 0, 12);
+        players = [p, { x: 16, y: 16, size: 0.7, name: 'RED' }];
+        keys.d = true;
+        updatePlayers(12 / PLAYER_SPEED);
         gameOver && winner === 'BLUE' && p.x < 12;
     `), true);
 });
+
+for (const [blueX, outcome, label] of [
+    [6, 'RED', 'the first finisher wins even when both can reach the goal in one frame'],
+    [8, 'DRAW', 'the race is a draw when both players reach the goal on the same step'],
+]) {
+    test(label, () => {
+        const run = loadGame();
+        run(`
+            CELL_SIZE = 1; OFFSET_X = 0; OFFSET_Y = 0;
+            maze = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
+            players = [
+                { x: ${blueX}, y: 10, size: 0.7, name: 'BLUE' },
+                { x: 8, y: 11, size: 0.7, name: 'RED' },
+            ];
+            keys.d = keys.ArrowRight = true;
+            updatePlayers(0.05);
+        `);
+        assert.equal(run('winner'), outcome);
+    });
+}
 
 for (const [player, horizontal, vertical] of [[0, 'd', 's'], [1, 'ArrowRight', 'ArrowDown']]) {
     test(`player ${player + 1} travels at the same speed diagonally and horizontally`, () => {
