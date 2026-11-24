@@ -4,12 +4,12 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-function loadGame() {
+function loadGame(fillRect = () => {}) {
     const inputHandlers = {};
     const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
     const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
     const element = { classList: { add() {}, remove() {} } };
-    const canvas = { getContext: () => ({ fillRect() {}, strokeRect() {} }) };
+    const canvas = { getContext: () => ({ fillRect, strokeRect() {} }) };
     const context = vm.createContext({
         window: { innerWidth: 800, innerHeight: 600, addEventListener() {} },
         document: {
@@ -59,6 +59,22 @@ test('maze walls flash every three seconds and restart with the walls hidden', (
     assert.equal(run('updateFlash(0.36); wallsVisible'), false);
     assert.equal(run('updateFlash(2.60); wallsVisible'), true);
     assert.equal(run('restartGame(); updateFlash(0.15); wallsVisible'), false);
+});
+
+test('the renderer only draws wall tiles during a flash', () => {
+    const fills = [];
+    const run = loadGame(function () { fills.push(this.fillStyle); });
+    run(`
+        maze = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
+        maze[0][0] = 1;
+        render();
+    `);
+    assert.equal(fills.filter(color => color === '#000000').length, 1, 'only the background is painted black');
+    assert.equal(fills.includes('#FFFFFF'), false);
+
+    fills.length = 0;
+    run('wallsVisible = true; render();');
+    assert.equal(fills.filter(color => color === '#FFFFFF').length, 1, 'the wall is drawn during the flash');
 });
 
 for (const [player, left, right, up, down] of [

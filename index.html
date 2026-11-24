@@ -104,7 +104,6 @@
         // Colors
         const COLOR_BACKGROUND = '#000000';
         const COLOR_WALL_VISIBLE = '#FFFFFF';
-        const COLOR_WALL_INVISIBLE = '#000000';
         const COLOR_PLAYER1 = '#4444FF'; // Blue
         const COLOR_PLAYER2 = '#FF4444'; // Red
         const COLOR_GOAL = '#44FF44'; // Green
@@ -480,19 +479,19 @@
             ctx.fillStyle = COLOR_BACKGROUND;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw maze walls
-            const wallColor = wallsVisible ? COLOR_WALL_VISIBLE : COLOR_WALL_INVISIBLE;
-            ctx.fillStyle = wallColor;
-
-            for (let y = 0; y < GRID_SIZE; y++) {
-                for (let x = 0; x < GRID_SIZE; x++) {
-                    if (maze[y][x] === 1) {
-                        ctx.fillRect(
-                            OFFSET_X + x * CELL_SIZE,
-                            OFFSET_Y + y * CELL_SIZE,
-                            CELL_SIZE,
-                            CELL_SIZE
-                        );
+            // The background already covers hidden walls.
+            if (wallsVisible) {
+                ctx.fillStyle = COLOR_WALL_VISIBLE;
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    for (let x = 0; x < GRID_SIZE; x++) {
+                        if (maze[y][x] === 1) {
+                            ctx.fillRect(
+                                OFFSET_X + x * CELL_SIZE,
+                                OFFSET_Y + y * CELL_SIZE,
+                                CELL_SIZE,
+                                CELL_SIZE
+                            );
+                        }
                     }
                 }
             }
