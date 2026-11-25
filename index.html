@@ -540,16 +540,21 @@
         // ============================================
         // GAME LOOP
         // ============================================
-        let lastTime = 0;
+        let lastTime = null;
+
+        document.addEventListener('visibilitychange', () => {
+            lastTime = null;
+            if (document.hidden) resetKeys();
+        });
 
         function gameLoop(timestamp) {
-            const dt = (timestamp - lastTime) / 1000; // Delta time in seconds
+            const dt = lastTime === null ? 0 : (timestamp - lastTime) / 1000;
             lastTime = timestamp;
 
             // Cap delta time to prevent huge jumps
             const cappedDt = Math.min(dt, 0.1);
 
-            if (!gameOver) {
+            if (!gameOver && !document.hidden) {
                 updateFlash(cappedDt);
                 updatePlayers(cappedDt);
             }

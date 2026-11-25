@@ -25,8 +25,25 @@ function loadGame(fillRect = () => {}) {
         inputHandlers[type]({ ...event, preventDefault() { prevented = true; } });
         return prevented;
     };
+    run.setHidden = hidden => {
+        context.document.hidden = hidden;
+        inputHandlers.visibilitychange();
+    };
     return run;
 }
+
+test('starting or resuming the tab does not advance the game for unplayed time', () => {
+    const run = loadGame();
+    assert.equal(run('gameLoop(1000); flashTimer'), 0);
+    assert.equal(run('gameLoop(1050); flashTimer'), 50);
+    run.key('keydown', { key: 'd' });
+    run.setHidden(true);
+    assert.equal(run('keys.d'), false);
+    assert.equal(run('gameLoop(1100); gameLoop(1150); flashTimer'), 50);
+    run.setHidden(false);
+    assert.equal(run('gameLoop(8000); flashTimer'), 50);
+    assert.equal(run('gameLoop(8050); flashTimer'), 100);
+});
 
 test('browser shortcuts do not move players or consume the shortcut', () => {
     const run = loadGame();
